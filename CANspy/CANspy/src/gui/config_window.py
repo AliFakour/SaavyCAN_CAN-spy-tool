@@ -42,6 +42,7 @@ class ConfigWindow(QWidget):
         self.table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self.table.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
         self.table.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Interactive)
 
         # Main layout
         main_layout = QVBoxLayout(self)
@@ -193,7 +194,6 @@ class ConfigWindow(QWidget):
         self.table.setItem(row, 5, QTableWidgetItem(data))
         self.table.setItem(row, 6, QTableWidgetItem(cycle_time))
         self.table.setItem(row, 7, QTableWidgetItem(str(count)))
-        # Resize columns to fit contents only for the first row
         if row == 0:
             self.table.resizeColumnsToContents()
 
