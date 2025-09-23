@@ -1,0 +1,150 @@
+===============================================================================
+LiesMich.txt
+
+PCAN-Light V2.xx
+Copyright (c) 2015 PEAK-System Technik GmbH Darmstadt
+Alle Rechte vorbehalten.
+===============================================================================
+
+Maximieren Sie das Editor-Fenster, um diese Datei leichter lesen zu können.
+
+
+Inhalt:
+-------
+  * Einleitung
+  * Systemvoraussetzungen
+  * Bedingungen zur Verwendung dieser Dateien
+  * Inhalt des Verzeichnisses
+  * Inbetriebnahme von PCAN-Hardware
+  * PEAK-System Technik GmbH kontaktieren
+
+
+Einleitung
+----------
+Das PCAN-System der Firma PEAK-System Technik GmbH besteht aus einer Sammlung
+von Windows Geräte-Treibern. Diese sorgen für die Echtzeit-Anbindung von
+Windows-Applikationen an alle CAN-Busse, die mittels PCAN-Hardware an den
+PC angeschlossen sind.
+
+PCAN-Light ist eine einfache Programmier-Schnittstelle zum PCAN-System. Über
+verschiedene Interface-DLLs wird die Verbindung eigener Applikationen an die
+Gerätetreiber und die PCAN-Hardware ermöglicht, um eine CAN-Kommunikation zu
+betreiben.
+
+Die mitgelieferten Treiber, die PCAN-Light API und die CAN-Bus Monitor
+Software "PCAN-View" sind die im Funktionsumfang reduzierten Versionen
+der käuflich zu erwerbenden Software-Pakete PCAN-Evaluation,
+PCAN-Developer und PCAN-Explorer.
+
+
+Bedingungen zur Verwendung dieser Dateien
+-----------------------------------------
+Die PEAK-System Technik GmbH räumt dem Kunden das Recht ein, die in diesem
+Softwarepaket enthaltenen Dateien zu verwenden, solange dies in Verbindung mit
+Hardware original von PEAK-System oder mit OEM-Hardware von PEAK-System
+geschieht. Es ist ausdrücklich NICHT erlaubt, diese Dateien (auch auszugsweise)
+mit Fremdhardware zu verwenden.
+
+Wenn Sie nicht sicher sind, ob Sie mit der verwendeten Hardware auch eine
+entsprechende Lizenz erworben haben, setzen Sie sich bitte mit unserem
+technischen Support in Verbindung (support@peak-system.com).
+
+
+Systemvoraussetzungen
+---------------------
+- Betriebssysteme: Windows 7/Vista/XP, Linux oder DOS
+
+
+Inhalt des Verzeichnisses
+-------------------------
+LiesMich.txt
+    Diese Textdatei.
+
+ReadMe.txt
+    Diese Textdatei in englischer Übersetzung.
+
+PCANLight_deu.chm
+    Die PCAN-Light Dokumentation in deutscher Sprache.
+
+PCANLight_enu.chm
+    Die PCAN-Light Dokumentation in englischer Sprache.
+
+\Include
+    Enthält PCAN-Light Header Dateien für die verschiedenen Programmiersprachen.
+	
+\Win32
+    Enthält die 32Bit Interface DLLs sowie die LIBs der verschiedenen Hardwaretypen.
+    Die DLLs und Libs können für folgende Hardware vewrwendet werden:
+	
+    pcan_dng.dll 
+    für PCAN-Dongle 
+
+    pcan_isa.dll & pcan_2isa.dll
+    für PCAN-PC/104
+        PCAN-ISA
+	
+    pcan_pcc.dll & pcan_2pcc.dll
+    für PCAN-PC Card
+
+    pcan_pci.dll & pcan_2pci.dll
+    für PCAN-cPCI
+        PCAN-miniPCI
+        PCAN-PC/104-Plus
+        PCAN-PCI
+        PCAN-PCI Express
+
+    pcan_usb.dll & pcan_2usb.dll
+    für PCAN-USB
+        PCAN-USB Hub
+        PCAN-USB Pro
+
+    \BB_LIB
+        LIB Dateien für Borland Builder 
+
+    \VC_LIB
+        LIB Dateien für Visual C/C++
+
+
+\x64
+    Enthält die 64Bit Interface DLLs der verschiedenen Hardwaretypen.
+    Die DLLs können für folgende Hardware vewrwendet werden:
+	
+    pcan_pci.dll & pcan_2pci.dll
+    für PCAN-cPCI
+        PCAN-miniPCI
+        PCAN-PC/104-Plus
+        PCAN-PCI
+        PCAN-PCI Express
+
+    pcan_usb.dll & pcan_2usb.dll
+    für PCAN-USB
+        PCAN-USB Hub
+        PCAN-USB Pro
+	
+
+\Samples
+    Enthält Beispieldateien, welche die Verwendung der PCAN-Light API in
+    verschiedenen Programmiersprachen und Entwicklungsumgebungen demonstrieren.
+
+	
+Inbetriebnahme von PCAN-Hardware
+--------------------------------
+Für Informationen über die Inbetriebnahme von PCAN-Hardware beachten Sie bitte
+die Dokumentation der jeweiligen Hardware. Diese finden Sie im Verzeichnis
+<Produkt-CD>\Pdf.
+
+
+PEAK-System Technik GmbH kontaktieren
+-------------------------------------
+Haben Sie Fragen bezüglich der Inbetriebnahme von PCAN-Hardware, oder benötigen
+Sie Informationen über weitere PEAK CAN-Produkte, wenden Sie sich bitte an:
+
+PEAK-System Technik GmbH
+Otto-Röhm-Str. 69
+64293 Darmstadt
+
+Tel. +49 6151 / 8173-20
+FAX  +49 6151 / 8173-29
+
+support@peak-system.com
+http://www.peak-system.com
