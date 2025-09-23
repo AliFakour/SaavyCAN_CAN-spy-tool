@@ -4,6 +4,7 @@ from PyQt5.QtCore import pyqtSignal
 import threading
 import time
 import can
+from gui.custom_items import HexIDItem
 
 class ConfigWindow(QWidget):
     message_received = pyqtSignal(dict)
@@ -92,7 +93,7 @@ class ConfigWindow(QWidget):
                     except Exception:
                         timestamp = str(msg.timestamp)
 
-                    can_id = hex(msg.arbitration_id).upper()
+                    can_id = hex(msg.arbitration_id)  # This naturally uses lowercase 'x'
                     msg_type = "FD" if getattr(msg, "is_fd", False) else "STD"
                     length = msg.dlc
                     data = ' '.join(f"{b:02X}" for b in msg.data)
@@ -170,21 +171,38 @@ class ConfigWindow(QWidget):
         self.table.setSortingEnabled(was_sorting_enabled)
 
     def handle_overwrite_change(self, state):
+        # Temporarily disable sorting while modifying the table
+        was_sorting_enabled = self.table.isSortingEnabled()
+        self.table.setSortingEnabled(False)
+    
         if state == QtCore.Qt.Checked:
-            # Remove duplicate CAN IDs, keep only the latest row for each ID
+            # Find all unique CAN IDs and their rows
             can_id_rows = {}
             for row in range(self.table.rowCount()):
-                can_id = self.table.item(row, 2).text()
-                can_id_rows.setdefault(can_id, []).append(row)
+                item = self.table.item(row, 2)
+                if item:
+                    can_id = item.text()
+                    if can_id in can_id_rows:
+                        can_id_rows[can_id].append(row)
+                    else:
+                        can_id_rows[can_id] = [row]
+            
+            # Remove all but the last row for each CAN ID with duplicates
             rows_to_remove = []
             for can_id, rows in can_id_rows.items():
                 if len(rows) > 1:
+                    # Keep the last row (most recent data)
                     rows_to_remove.extend(rows[:-1])
+            
+            # Remove rows in reverse order to keep indices valid
             for row in sorted(rows_to_remove, reverse=True):
                 self.table.removeRow(row)
-            self.update_row_numbers()
-        else:
-            self.update_row_numbers()
+        
+        # Update row numbers after removing rows
+        self.update_row_numbers()
+        
+        # Re-enable sorting if it was enabled
+        self.table.setSortingEnabled(was_sorting_enabled)
 
     def update_row_numbers(self):
         # Set row number column to be sequential from 1 to N
@@ -194,7 +212,7 @@ class ConfigWindow(QWidget):
     def set_row(self, row, timestamp, can_id, msg_type, length, data, cycle_time, count):
         self.table.setItem(row, 0, QTableWidgetItem(str(row + 1)))
         self.table.setItem(row, 1, QTableWidgetItem(timestamp))
-        self.table.setItem(row, 2, QTableWidgetItem(can_id.upper()))
+        self.table.setItem(row, 2, HexIDItem(can_id.upper()))  # Use custom item for CAN ID
         self.table.setItem(row, 3, QTableWidgetItem(msg_type))
         self.table.setItem(row, 4, QTableWidgetItem(str(length)))
         self.table.setItem(row, 5, QTableWidgetItem(data))
@@ -218,9 +236,11 @@ class ConfigWindow(QWidget):
         self.status_label.setText("Disconnected.")
 
     def find_row_by_can_id(self, can_id):
+        """Find row containing the given CAN ID, case insensitive"""
+        can_id_lower = can_id.lower()
         for row in range(self.table.rowCount()):
             item = self.table.item(row, 2)  # CAN ID is in column 2
-            if item and item.text() == can_id:
+            if item and item.text().lower() == can_id_lower:
                 return row
         return None
 
