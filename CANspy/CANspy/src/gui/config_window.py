@@ -154,6 +154,7 @@ class ConfigWindow(QWidget):
             row = self.table.rowCount()
             self.table.insertRow(row)
             self.set_row(row, timestamp, can_id, msg_type, length, data, cycle_time, count)
+        self.update_row_numbers()
 
     def handle_overwrite_change(self, state):
         if state == QtCore.Qt.Checked:
@@ -167,7 +168,6 @@ class ConfigWindow(QWidget):
             for can_id, rows in can_id_rows.items():
                 if len(rows) > 1:
                     rows_to_remove.extend(rows[:-1])
-            # Remove rows in reverse order to keep indices valid
             for row in sorted(rows_to_remove, reverse=True):
                 self.table.removeRow(row)
             # Rebuild self.msgs mapping
@@ -175,6 +175,14 @@ class ConfigWindow(QWidget):
             for row in range(self.table.rowCount()):
                 can_id = self.table.item(row, 2).text()
                 self.msgs[can_id] = row
+            self.update_row_numbers()
+        else:
+            self.update_row_numbers()
+
+    def update_row_numbers(self):
+        # Set row number column to be sequential from 1 to N
+        for row in range(self.table.rowCount()):
+            self.table.setItem(row, 0, QTableWidgetItem(str(row + 1)))
 
     def set_row(self, row, timestamp, can_id, msg_type, length, data, cycle_time, count):
         self.table.setItem(row, 0, QTableWidgetItem(str(row + 1)))
@@ -185,6 +193,9 @@ class ConfigWindow(QWidget):
         self.table.setItem(row, 5, QTableWidgetItem(data))
         self.table.setItem(row, 6, QTableWidgetItem(cycle_time))
         self.table.setItem(row, 7, QTableWidgetItem(str(count)))
+        # Resize columns to fit contents only for the first row
+        if row == 0:
+            self.table.resizeColumnsToContents()
 
     def update_row(self, row, timestamp, can_id, msg_type, length, data, cycle_time, count):
         self.table.setItem(row, 1, QTableWidgetItem(timestamp))
