@@ -218,3 +218,20 @@ class ConfigWindow(QWidget):
             if item and item.text() == can_id:
                 return row
         return None
+
+    def clear_table(self):
+        # Temporarily disable sorting
+        was_sorting_enabled = self.table.isSortingEnabled()
+        self.table.setSortingEnabled(False)
+        
+        # Clear the table
+        self.table.setRowCount(0)
+        
+        # Reset all data tracking
+        self.last_timestamps = {}
+        self.counts = {}
+        
+        # Re-enable sorting if it was enabled
+        self.table.setSortingEnabled(was_sorting_enabled)
+        
+        self.status_label.setText("Table cleared.")

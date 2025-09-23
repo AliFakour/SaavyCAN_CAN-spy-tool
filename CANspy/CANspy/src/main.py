@@ -46,6 +46,11 @@ class MainApp(QMainWindow):
         self.connect_action.triggered.connect(self.toggle_connection)
         menubar.addAction(self.connect_action)
 
+        # Clear table action
+        clear_action = QAction(QIcon(), "Clear", self)
+        clear_action.triggered.connect(self.clear_table)
+        menubar.addAction(clear_action)
+
         # Exit action
         exit_action = QAction(QIcon(), "Exit", self)
         exit_action.triggered.connect(self.exit_app)
@@ -58,6 +63,9 @@ class MainApp(QMainWindow):
         else:
             self.config_window.stop_receiving()
             self.connect_action.setText("Connect")
+
+    def clear_table(self):
+        self.config_window.clear_table()
 
     def exit_app(self):
         self.config_window.stop_receiving()
