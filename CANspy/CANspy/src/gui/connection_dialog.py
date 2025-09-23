@@ -2,8 +2,8 @@ from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, QComboBo
                              QTabWidget, QWidget, QLineEdit, QTreeWidget, QTreeWidgetItem,
                              QPushButton, QGroupBox, QFormLayout, QCheckBox, QSpinBox,
                              QDoubleSpinBox, QRadioButton, QButtonGroup, QFrame)
-from PyQt5.QtGui import QIcon
-from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QIcon, QFont, QBrush, QColor
+from PyQt5.QtCore import Qt, QTimer
 import can
 import re
 
@@ -26,8 +26,10 @@ class ConnectionDialog(QDialog):
         self.hardware_tree.setHeaderHidden(True)
         self.hardware_layout.addWidget(self.hardware_tree)
         
-        # Load available hardware
-        self.load_hardware()
+        # Scan button for manual refresh
+        self.scan_button = QPushButton("Scan for Hardware")
+        self.scan_button.clicked.connect(self.load_hardware)
+        self.hardware_layout.addWidget(self.scan_button)
         
         # Settings tabs (right side)
         self.tabs = QTabWidget()
@@ -64,23 +66,145 @@ class ConnectionDialog(QDialog):
         self.ok_button.clicked.connect(self.accept)
         self.cancel_button.clicked.connect(self.reject)
         self.help_button.clicked.connect(self.show_help)
+        self.hardware_tree.itemSelectionChanged.connect(self.on_hardware_selection_changed)
         
         # Initialize default selection
         self.set_default_values()
+        
+        # Load hardware initially
+        self.load_hardware()
+        
+        # Set up timer for real-time hardware detection
+        self.refresh_timer = QTimer(self)
+        self.refresh_timer.timeout.connect(self.load_hardware)
+        self.refresh_timer.start(5000)  # Check every 5 seconds
 
     def load_hardware(self):
+        """Detect and display actual PCAN hardware devices"""
+        previously_selected = None
+        if self.hardware_tree.selectedItems():
+            previously_selected = self.hardware_tree.selectedItems()[0].text(0)
+            
+        self.hardware_tree.clear()
+        
         try:
-            # Try to detect available PCAN hardware
-            # This is a placeholder - actual hardware detection depends on the PCAN API
-            pcan_usb = QTreeWidgetItem(self.hardware_tree)
-            pcan_usb.setText(0, "PCAN-USB FD: Device ID 80000000h")
-            pcan_usb.setIcon(0, QIcon("path/to/usb-icon.png"))  # Add an icon path if available
-            pcan_usb.setSelected(True)
+            # Check for available PCAN hardware using the PCAN-Basic API
+            import can.interfaces.pcan as pcan
+            
+            # Common PCAN channels to check
+            channels = [
+                'PCAN_USBBUS1', 'PCAN_USBBUS2', 'PCAN_USBBUS3', 'PCAN_USBBUS4',
+                'PCAN_USBBUS5', 'PCAN_USBBUS6', 'PCAN_USBBUS7', 'PCAN_USBBUS8'
+            ]
+            
+            found_devices = False
+            
+            for channel in channels:
+                try:
+                    # Try to initialize the channel (will fail if not available)
+                    bus = can.Bus(interface='pcan', channel=channel, bitrate=500000)
+                    
+                    # Get hardware info if possible
+                    hw_name = "PCAN-USB"
+                    if hasattr(bus, 'get_hardware_name'):
+                        try:
+                            hw_name = bus.get_hardware_name()
+                        except:
+                            pass
+                    
+                    # If it's an FD capable device
+                    is_fd = False
+                    try:
+                        # Check if FD is available
+                        bus.shutdown()
+                        bus = can.Bus(interface='pcan', channel=channel, bitrate=500000, fd=True)
+                        is_fd = True
+                        bus.shutdown()
+                    except:
+                        pass
+                    
+                    device_text = f"{hw_name}{' FD' if is_fd else ''}: {channel}"
+                    
+                    # Add to tree with green text
+                    device_item = QTreeWidgetItem(self.hardware_tree)
+                    device_item.setText(0, device_text)
+                    
+                    # Set green color and bold font
+                    green_brush = QBrush(QColor(0, 128, 0))  # Dark green
+                    bold_font = QFont()
+                    bold_font.setBold(True)
+                    device_item.setForeground(0, green_brush)
+                    device_item.setFont(0, bold_font)
+                    
+                    # Store channel name in item data for later retrieval
+                    device_item.setData(0, Qt.UserRole, channel)
+                    
+                    found_devices = True
+                    
+                    # Re-select previously selected item if it exists
+                    if previously_selected and previously_selected == device_text:
+                        device_item.setSelected(True)
+                    
+                except Exception as e:
+                    # This channel is not available
+                    continue
+                finally:
+                    if 'bus' in locals() and bus:
+                        bus.shutdown()
+            
+            if not found_devices:
+                # No devices found - red text and disable tabs
+                item = QTreeWidgetItem(self.hardware_tree)
+                item.setText(0, "No PCAN hardware detected")
+                
+                # Set red color and bold font
+                red_brush = QBrush(QColor(255, 0, 0))  # Red
+                bold_font = QFont()
+                bold_font.setBold(True)
+                item.setForeground(0, red_brush)
+                item.setFont(0, bold_font)
+                
+                # Disable tabs
+                self.tabs.setEnabled(False)
+            else:
+                # Hardware found - enable tabs
+                self.tabs.setEnabled(True)
+                
         except Exception as e:
             print(f"Error loading hardware: {e}")
-            # Add dummy entry if hardware detection fails
+            # Add error message if hardware detection fails
             item = QTreeWidgetItem(self.hardware_tree)
-            item.setText(0, "No PCAN hardware detected")
+            error_text = f"Error detecting hardware: {str(e)}"
+            item.setText(0, error_text)
+            
+            # Set red color and bold font
+            red_brush = QBrush(QColor(255, 0, 0))
+            bold_font = QFont()
+            bold_font.setBold(True)
+            item.setForeground(0, red_brush)
+            item.setFont(0, bold_font)
+            
+            # Disable tabs
+            self.tabs.setEnabled(False)
+        
+        # Select first item if any and none was previously selected
+        if not self.hardware_tree.selectedItems() and self.hardware_tree.topLevelItemCount() > 0:
+            self.hardware_tree.topLevelItem(0).setSelected(True)
+        
+        # Update OK button state based on selection
+        self.on_hardware_selection_changed()
+
+    def on_hardware_selection_changed(self):
+        """Enable/disable OK button based on hardware selection"""
+        selected = self.hardware_tree.selectedItems()
+        valid_selection = False
+        
+        if selected:
+            # Check if it's a valid device (not an error message)
+            text = selected[0].text(0)
+            valid_selection = "No PCAN hardware detected" not in text and "Error detecting" not in text
+        
+        self.ok_button.setEnabled(valid_selection)
 
     def setup_can_tab(self):
         layout = QFormLayout(self.can_setup_tab)
@@ -213,11 +337,18 @@ class ConnectionDialog(QDialog):
         selected_items = self.hardware_tree.selectedItems()
         channel = 'PCAN_USBBUS1'  # Default
         if selected_items:
-            # Extract device info from selected item
-            item_text = selected_items[0].text(0)
-            if "Device ID" in item_text:
-                # This is just a placeholder - actual channel mapping would depend on your implementation
-                channel = 'PCAN_USBBUS1'
+            # Get channel from item data if available
+            stored_channel = selected_items[0].data(0, Qt.UserRole)
+            if stored_channel:
+                channel = stored_channel
+            else:
+                # Extract from text as fallback
+                item_text = selected_items[0].text(0)
+                # Try to extract channel name from the end (after colon)
+                if ":" in item_text:
+                    channel_part = item_text.split(":")[-1].strip()
+                    if channel_part:
+                        channel = channel_part
         
         config = {
             'interface': 'pcan',
@@ -230,3 +361,8 @@ class ConnectionDialog(QDialog):
             config['data_bitrate'] = data_bitrate
             
         return config
+
+    def closeEvent(self, event):
+        """Stop the timer when dialog is closed"""
+        self.refresh_timer.stop()
+        super().closeEvent(event)
