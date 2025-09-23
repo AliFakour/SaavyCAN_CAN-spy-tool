@@ -72,12 +72,17 @@ class ConfigWindow(QWidget):
     def receive_messages(self):
         bus = None
         try:
-            bus = can.interface.Bus(
-                interface='pcan',
-                channel='PCAN_USBBUS1',
-                bitrate=500000,
-                fd=self.fd_checkbox.isChecked()
-            )
+            # Use stored configuration if available
+            if hasattr(self, 'can_config'):
+                bus = can.interface.Bus(**self.can_config)
+            else:
+                # Fallback to old configuration
+                bus = can.interface.Bus(
+                    interface='pcan',
+                    channel='PCAN_USBBUS1',
+                    bitrate=500000,
+                    fd=self.fd_checkbox.isChecked()
+                )
             while self.running:
                 msg = bus.recv(1.0)
                 if msg:
@@ -235,3 +240,26 @@ class ConfigWindow(QWidget):
         self.table.setSortingEnabled(was_sorting_enabled)
         
         self.status_label.setText("Table cleared.")
+
+    def configure_can(self, config):
+        """Configure CAN parameters based on dialog settings"""
+        self.can_config = config
+        
+        # Update UI to reflect settings
+        if 'bitrate' in config:
+            bitrate_kbps = config['bitrate'] / 1000
+            for i in range(self.baud_rate_combo.count()):
+                if str(int(bitrate_kbps)) in self.baud_rate_combo.itemText(i):
+                    self.baud_rate_combo.setCurrentIndex(i)
+                    break
+        
+        self.fd_checkbox.setChecked(config.get('fd', False))
+        
+        # Update status label
+        bitrate = config.get('bitrate', 500000) / 1000
+        fd_text = ""
+        if config.get('fd', False):
+            data_bitrate = config.get('data_bitrate', bitrate * 1000) / 1000
+            fd_text = f" (FD: {data_bitrate} kbps)"
+        
+        self.status_label.setText(f"Configured: {bitrate} kbps{fd_text}")

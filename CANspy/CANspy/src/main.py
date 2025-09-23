@@ -26,6 +26,7 @@ if missing_modules:
         sys.exit(1)
 
 from gui.config_window import ConfigWindow
+from gui.connection_dialog import ConnectionDialog
 
 class MainApp(QMainWindow):
     def __init__(self):
@@ -57,12 +58,21 @@ class MainApp(QMainWindow):
         menubar.addAction(exit_action)
 
     def toggle_connection(self):
-        if self.connect_action.isChecked():
-            self.config_window.start_receiving()
-            self.connect_action.setText("Disconnect")
-        else:
+        if not self.connect_action.isChecked():
             self.config_window.stop_receiving()
             self.connect_action.setText("Connect")
+        else:
+            # Show connection dialog
+            dialog = ConnectionDialog(self)
+            if dialog.exec_():
+                # User clicked OK
+                config = dialog.get_configuration()
+                self.config_window.configure_can(config)
+                self.config_window.start_receiving()
+                self.connect_action.setText("Disconnect")
+            else:
+                # User cancelled
+                self.connect_action.setChecked(False)
 
     def clear_table(self):
         self.config_window.clear_table()
