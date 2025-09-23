@@ -41,8 +41,8 @@ class ConfigWindow(QWidget):
         self.table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         self.table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self.table.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
-        self.table.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
         self.table.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Interactive)
+        self.table.setSortingEnabled(True)  # <-- Enable sorting
 
         # Main layout
         main_layout = QVBoxLayout(self)
@@ -53,7 +53,7 @@ class ConfigWindow(QWidget):
         # Threading and message tracking
         self.receive_thread = None
         self.running = False
-        self.msgs = {}  # {can_id: row}
+        self.msgs = {}  # {can_id: msg_data}
         self.last_timestamps = {}
         self.counts = {}
 
@@ -87,7 +87,7 @@ class ConfigWindow(QWidget):
                     except Exception:
                         timestamp = str(msg.timestamp)
 
-                    can_id = hex(msg.arbitration_id)
+                    can_id = hex(msg.arbitration_id).upper()
                     msg_type = "FD" if getattr(msg, "is_fd", False) else "STD"
                     length = msg.dlc
                     data = ' '.join(f"{b:02X}" for b in msg.data)
@@ -133,8 +133,12 @@ class ConfigWindow(QWidget):
                 bus.shutdown()
 
     def handle_message(self, msg_data):
+        # Temporarily disable sorting
+        was_sorting_enabled = self.table.isSortingEnabled()
+        self.table.setSortingEnabled(False)
+        
         timestamp = msg_data['timestamp']
-        can_id = msg_data['can_id']
+        can_id = msg_data['can_id'].upper()
         msg_type = msg_data['msg_type']
         length = msg_data['length']
         data = msg_data['data']
@@ -143,19 +147,22 @@ class ConfigWindow(QWidget):
         overwrite = msg_data['overwrite']
 
         if overwrite:
-            if can_id in self.msgs:
-                row = self.msgs[can_id]
+            row = self.find_row_by_can_id(can_id)
+            if row is not None:
                 self.update_row(row, timestamp, can_id, msg_type, length, data, cycle_time, count)
             else:
                 row = self.table.rowCount()
                 self.table.insertRow(row)
                 self.set_row(row, timestamp, can_id, msg_type, length, data, cycle_time, count)
-                self.msgs[can_id] = row
         else:
             row = self.table.rowCount()
             self.table.insertRow(row)
             self.set_row(row, timestamp, can_id, msg_type, length, data, cycle_time, count)
+        
         self.update_row_numbers()
+        
+        # Re-enable sorting if it was enabled before
+        self.table.setSortingEnabled(was_sorting_enabled)
 
     def handle_overwrite_change(self, state):
         if state == QtCore.Qt.Checked:
@@ -164,18 +171,12 @@ class ConfigWindow(QWidget):
             for row in range(self.table.rowCount()):
                 can_id = self.table.item(row, 2).text()
                 can_id_rows.setdefault(can_id, []).append(row)
-            # Remove all but the last row for each CAN ID
             rows_to_remove = []
             for can_id, rows in can_id_rows.items():
                 if len(rows) > 1:
                     rows_to_remove.extend(rows[:-1])
             for row in sorted(rows_to_remove, reverse=True):
                 self.table.removeRow(row)
-            # Rebuild self.msgs mapping
-            self.msgs = {}
-            for row in range(self.table.rowCount()):
-                can_id = self.table.item(row, 2).text()
-                self.msgs[can_id] = row
             self.update_row_numbers()
         else:
             self.update_row_numbers()
@@ -188,7 +189,7 @@ class ConfigWindow(QWidget):
     def set_row(self, row, timestamp, can_id, msg_type, length, data, cycle_time, count):
         self.table.setItem(row, 0, QTableWidgetItem(str(row + 1)))
         self.table.setItem(row, 1, QTableWidgetItem(timestamp))
-        self.table.setItem(row, 2, QTableWidgetItem(can_id))
+        self.table.setItem(row, 2, QTableWidgetItem(can_id.upper()))
         self.table.setItem(row, 3, QTableWidgetItem(msg_type))
         self.table.setItem(row, 4, QTableWidgetItem(str(length)))
         self.table.setItem(row, 5, QTableWidgetItem(data))
@@ -210,3 +211,10 @@ class ConfigWindow(QWidget):
         if self.receive_thread and self.receive_thread.is_alive():
             self.receive_thread.join(timeout=2)
         self.status_label.setText("Disconnected.")
+
+    def find_row_by_can_id(self, can_id):
+        for row in range(self.table.rowCount()):
+            item = self.table.item(row, 2)  # CAN ID is in column 2
+            if item and item.text() == can_id:
+                return row
+        return None
