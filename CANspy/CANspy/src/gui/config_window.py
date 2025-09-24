@@ -1,10 +1,10 @@
 from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtWidgets import QWidget, QTableWidget, QTableWidgetItem, QCheckBox, QLabel, QVBoxLayout, QHBoxLayout
 from PyQt5.QtCore import pyqtSignal
-import threading
-import time
-import can
 from gui.custom_items import HexIDItem
+import threading  # Add this import
+import can  # Also add this to make sure can is imported
+import time  # For timestamps
 
 class ConfigWindow(QWidget):
     message_received = pyqtSignal(dict)
@@ -12,28 +12,26 @@ class ConfigWindow(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("USB2CAN Configuration")
-        self.setGeometry(100, 100, 800, 600)
-
-        # Controls
-        self.baud_rate_label = QtWidgets.QLabel("Baud Rate:")
-        self.baud_rate_combo = QtWidgets.QComboBox()
-        self.baud_rate_combo.addItems(["125 kbps", "250 kbps", "500 kbps", "1000 kbps"])
-        self.fd_checkbox = QtWidgets.QCheckBox("Enable FD")
-        self.overwrite_checkbox = QCheckBox("Overwrite")
-        self.overwrite_checkbox.setChecked(True)
-        self.status_label = QLabel("")
-
-        # Layout for controls
+        
+        # Create layout
+        main_layout = QVBoxLayout(self)
+        
+        # Controls layout with only overwrite checkbox and status label
         controls_layout = QHBoxLayout()
-        controls_layout.addWidget(self.baud_rate_label)
-        controls_layout.addWidget(self.baud_rate_combo)
-        controls_layout.addWidget(self.fd_checkbox)
+        
+        # Overwrite checkbox
+        self.overwrite_checkbox = QCheckBox("Overwrite", self)
+        self.overwrite_checkbox.setChecked(True)
+        self.overwrite_checkbox.stateChanged.connect(self.handle_overwrite_change)
         controls_layout.addWidget(self.overwrite_checkbox)
+        
+        # Status label (this will be replaced by status bar)
+        self.status_label = QLabel("", self)
         controls_layout.addWidget(self.status_label)
         controls_layout.addStretch()
-
+        
         # Data table
-        self.table = QTableWidget()
+        self.table = QTableWidget(self)
         self.table.setColumnCount(8)
         self.table.setHorizontalHeaderLabels([
             "#", "Timestamp", "CAN ID", "Type", "Length", "Data", "Cycle Time", "Count"
@@ -43,46 +41,59 @@ class ConfigWindow(QWidget):
         self.table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self.table.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
         self.table.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Interactive)
-        self.table.setSortingEnabled(True)  # <-- Enable sorting
-
-        # Main layout
-        main_layout = QVBoxLayout(self)
+        self.table.setSortingEnabled(True)
+        
+        # Add widgets to main layout
         main_layout.addLayout(controls_layout)
         main_layout.addWidget(self.table)
-        self.setLayout(main_layout)
-
-        # Threading and message tracking
+        
+        # Initialize variables for CAN reception
         self.receive_thread = None
         self.running = False
-        self.msgs = {}  # {can_id: msg_data}
         self.last_timestamps = {}
         self.counts = {}
-
+        self.can_config = None  # Will be set by configure_can()
+        
+        # Connect signals
         self.message_received.connect(self.handle_message)
-        self.overwrite_checkbox.stateChanged.connect(self.handle_overwrite_change)
+        
+        # Initial resize of columns after first data
+        if self.table.rowCount() > 0:
+            self.table.resizeColumnsToContents()
+
+    # Add configure_can method
+    def configure_can(self, config):
+        """Store CAN configuration"""
+        self.can_config = config
 
     def start_receiving(self):
-        baud_rate = self.baud_rate_combo.currentText()
-        enable_fd = self.fd_checkbox.isChecked()
-        self.status_label.setText(f"Receiving messages at {baud_rate} {'with FD' if enable_fd else 'without FD'}")
-        if not self.running:
-            self.running = True
-            self.receive_thread = threading.Thread(target=self.receive_messages, daemon=True)
-            self.receive_thread.start()
+        """Start receiving CAN messages"""
+        try:
+            if not self.running:
+                self.running = True
+                self.receive_thread = threading.Thread(target=self.receive_messages, daemon=True)
+                self.receive_thread.start()
+                return True
+            return False
+        except Exception as e:
+            print(f"Error starting receive thread: {e}")
+            self.status_label.setText(f"Error: {e}")
+            self.running = False
+            return False
 
     def receive_messages(self):
         bus = None
         try:
             # Use stored configuration if available
-            if hasattr(self, 'can_config'):
+            if hasattr(self, 'can_config') and self.can_config:
                 bus = can.interface.Bus(**self.can_config)
             else:
-                # Fallback to old configuration
+                # Fallback to default configuration
                 bus = can.interface.Bus(
                     interface='pcan',
                     channel='PCAN_USBBUS1',
                     bitrate=500000,
-                    fd=self.fd_checkbox.isChecked()
+                    fd=False
                 )
             while self.running:
                 msg = bus.recv(1.0)
@@ -245,6 +256,7 @@ class ConfigWindow(QWidget):
         return None
 
     def clear_table(self):
+        """Clear the message table and reset counters"""
         # Temporarily disable sorting
         was_sorting_enabled = self.table.isSortingEnabled()
         self.table.setSortingEnabled(False)
@@ -258,28 +270,3 @@ class ConfigWindow(QWidget):
         
         # Re-enable sorting if it was enabled
         self.table.setSortingEnabled(was_sorting_enabled)
-        
-        self.status_label.setText("Table cleared.")
-
-    def configure_can(self, config):
-        """Configure CAN parameters based on dialog settings"""
-        self.can_config = config
-        
-        # Update UI to reflect settings
-        if 'bitrate' in config:
-            bitrate_kbps = config['bitrate'] / 1000
-            for i in range(self.baud_rate_combo.count()):
-                if str(int(bitrate_kbps)) in self.baud_rate_combo.itemText(i):
-                    self.baud_rate_combo.setCurrentIndex(i)
-                    break
-        
-        self.fd_checkbox.setChecked(config.get('fd', False))
-        
-        # Update status label
-        bitrate = config.get('bitrate', 500000) / 1000
-        fd_text = ""
-        if config.get('fd', False):
-            data_bitrate = config.get('data_bitrate', bitrate * 1000) / 1000
-            fd_text = f" (FD: {data_bitrate} kbps)"
-        
-        self.status_label.setText(f"Configured: {bitrate} kbps{fd_text}")
